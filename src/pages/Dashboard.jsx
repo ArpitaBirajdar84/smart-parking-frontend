@@ -16,44 +16,39 @@ function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      // बरोबर API endpoints (तुमच्या बॅकेंड प्रमाणे)
-      const [slotsRes, vehiclesRes, bookingsRes] = await Promise.all([
-        api.get('/api/slots'),
-        api.get('/api/vehicles'),
-        api.get('/api/bookings')
-      ]);
+      console.log("Fetching dashboard data...");
+      
+      const slotsRes = await api.get('/api/slots');
+      const vehiclesRes = await api.get('/api/vehicles');
+      const bookingsRes = await api.get('/api/bookings');
+
+      console.log("Slots response:", slotsRes.data);
+      console.log("Vehicles response:", vehiclesRes.data);
+      console.log("Bookings response:", bookingsRes.data);
 
       // Slots data
-      const totalSlots = slotsRes.data?.data?.length || slotsRes.data?.length || 0;
+      const totalSlots = slotsRes.data?.length || 0;
       
       // Vehicles data  
-      const totalVehicles = vehiclesRes.data?.data?.length || vehiclesRes.data?.length || 0;
+      const totalVehicles = vehiclesRes.data?.length || 0;
       
-      // Active bookings data
-      let activeBookings = [];
-      let totalPayments = 0;
-      
-      if (bookingsRes.data?.data) {
-        activeBookings = bookingsRes.data.data.filter(b => b.status === 'active' || b.status === 'Active');
-        // Payments calculation (जर payment amount असेल तर)
-        totalPayments = bookingsRes.data.data.reduce((sum, b) => sum + (b.amount || 0), 0);
-      } else if (Array.isArray(bookingsRes.data)) {
-        activeBookings = bookingsRes.data.filter(b => b.status === 'active');
-        totalPayments = bookingsRes.data.reduce((sum, b) => sum + (b.amount || 0), 0);
+      // Active bookings
+      let activeBookingsList = [];
+      if (Array.isArray(bookingsRes.data)) {
+        activeBookingsList = bookingsRes.data.filter(b => b.status === 'active');
       }
-
-      // Active vehicles for table
-      const activeVehiclesList = activeBookings.map(booking => ({
-        vehicleNumber: booking.vehicleNumber || booking.vehicleId?.vehicleNumber || 'N/A',
-        vehicleType: booking.vehicleType || booking.vehicleId?.vehicleType || 'N/A',
-        slotNumber: booking.slotNumber || booking.slotId?.slotNumber || 'N/A',
-        entryTime: booking.entryTime || booking.createdAt || new Date()
+      
+      const activeVehiclesList = activeBookingsList.map(booking => ({
+        vehicleNumber: booking.vehicleNumber || 'N/A',
+        vehicleType: booking.vehicleType || 'N/A',
+        slotNumber: booking.slotNumber || 'N/A',
+        entryTime: booking.entryTime || new Date()
       }));
 
       setStats({ 
         vehicles: totalVehicles, 
         slots: totalSlots, 
-        payments: totalPayments 
+        payments: 0 
       });
       setActiveVehicles(activeVehiclesList);
 
@@ -63,19 +58,10 @@ function Dashboard() {
     }
   };
 
-  // Pagination logic
   const totalPages = Math.ceil(activeVehicles.length / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = activeVehicles.slice(indexOfFirstItem, indexOfLastItem);
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-  };
-
-  const handlePrevPage = () => {
-    if (currentPage > 1) setCurrentPage(currentPage - 1);
-  };
 
   return (
     <div>
@@ -120,45 +106,35 @@ function Dashboard() {
           <div className="card-header">
             <h3 className="card-title">Active Booking Table</h3>
           </div>
-          <div className="table-container flex-1-col table-scroll-400">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Vehicle No.</th>
-                  <th>Type</th>
-                  <th>Slot</th>
-                  <th>Entry Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentItems.length > 0 ? (
-                  currentItems.map((v, i) => (
-                    <tr key={i}>
-                      <td className="fw-500">{v.vehicleNumber}</td>
-                      <td><span className="badge badge-info">{v.vehicleType}</span></td>
-                      <td>{v.slotNumber}</td>
-                      <td>{new Date(v.entryTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4" className="text-center-p2 text-slate-500 p-2rem">No active bookings</td>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Vehicle No.</th>
+                <th>Type</th>
+                <th>Slot</th>
+                <th>Entry Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {currentItems.length > 0 ? (
+                currentItems.map((v, i) => (
+                  <tr key={i}>
+                    <td>{v.vehicleNumber}</td>
+                    <td>{v.vehicleType}</td>
+                    <td>{v.slotNumber}</td>
+                    <td>{new Date(v.entryTime).toLocaleTimeString()}</td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-
-            {totalPages > 1 && (
-              <div className="pagination-container">
-                <button onClick={handlePrevPage} disabled={currentPage === 1} className="pagination-btn">Prev</button>
-                <span className="pagination-text">{currentPage} / {totalPages}</span>
-                <button onClick={handleNextPage} disabled={currentPage === totalPages} className="pagination-btn">Next</button>
-              </div>
-            )}
-          </div>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4" style={{ textAlign: 'center' }}>No active bookings</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
 
-        <div className="card card-flex-col">
+        <div className="card">
           <div className="card-header">
             <h3 className="card-title">Payment Graph</h3>
           </div>
