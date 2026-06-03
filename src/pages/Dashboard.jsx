@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
-import { Car, Layers, CreditCard, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Car, Layers, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SubDashboard from '../components/SubDashboard';
 
@@ -16,25 +16,46 @@ function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const [revRes, vehiclesRes, slotsRes, allVehiclesRes] = await Promise.all([
-        api.get('/analytics/daily-revenue'),
-        api.get('/analytics/active-vehicles'),
-        api.get('/slots/all'),
-        api.get('/vehicles/all')
+      // बरोबर API endpoints (तुमच्या बॅकेंड प्रमाणे)
+      const [slotsRes, vehiclesRes, bookingsRes] = await Promise.all([
+        api.get('/api/slots'),
+        api.get('/api/vehicles'),
+        api.get('/api/bookings')
       ]);
 
-      let totalP = 0;
-      if (revRes.data.success && revRes.data.data.length > 0) {
-        const revenueData = revRes.data.data;
-        totalP = revenueData.reduce((sum, item) => sum + (item.totalPayments || 0), 0);
+      // Slots data
+      const totalSlots = slotsRes.data?.data?.length || slotsRes.data?.length || 0;
+      
+      // Vehicles data  
+      const totalVehicles = vehiclesRes.data?.data?.length || vehiclesRes.data?.length || 0;
+      
+      // Active bookings data
+      let activeBookings = [];
+      let totalPayments = 0;
+      
+      if (bookingsRes.data?.data) {
+        activeBookings = bookingsRes.data.data.filter(b => b.status === 'active' || b.status === 'Active');
+        // Payments calculation (जर payment amount असेल तर)
+        totalPayments = bookingsRes.data.data.reduce((sum, b) => sum + (b.amount || 0), 0);
+      } else if (Array.isArray(bookingsRes.data)) {
+        activeBookings = bookingsRes.data.filter(b => b.status === 'active');
+        totalPayments = bookingsRes.data.reduce((sum, b) => sum + (b.amount || 0), 0);
       }
 
-      const actV = vehiclesRes.data.success ? vehiclesRes.data.data : [];
-      const totSlots = slotsRes.data.success ? slotsRes.data.data.length : 0;
-      const totVehicles = allVehiclesRes.data.success ? allVehiclesRes.data.data.length : 0;
+      // Active vehicles for table
+      const activeVehiclesList = activeBookings.map(booking => ({
+        vehicleNumber: booking.vehicleNumber || booking.vehicleId?.vehicleNumber || 'N/A',
+        vehicleType: booking.vehicleType || booking.vehicleId?.vehicleType || 'N/A',
+        slotNumber: booking.slotNumber || booking.slotId?.slotNumber || 'N/A',
+        entryTime: booking.entryTime || booking.createdAt || new Date()
+      }));
 
-      setStats({ vehicles: totVehicles, slots: totSlots, payments: totalP });
-      setActiveVehicles(actV);
+      setStats({ 
+        vehicles: totalVehicles, 
+        slots: totalSlots, 
+        payments: totalPayments 
+      });
+      setActiveVehicles(activeVehiclesList);
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -89,7 +110,7 @@ function Dashboard() {
           </div>
           <div className="stat-content">
             <h3>Total Payments</h3>
-            <p>{stats.payments}</p>
+            <p>₹{stats.payments}</p>
           </div>
         </div>
       </div>
@@ -129,23 +150,9 @@ function Dashboard() {
 
             {totalPages > 1 && (
               <div className="pagination-container">
-                <button
-                  onClick={handlePrevPage}
-                  disabled={currentPage === 1}
-                  className="pagination-btn"
-                >
-                  Prev
-                </button>
-                <span className="pagination-text">
-                  {currentPage} / {totalPages}
-                </span>
-                <button
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages}
-                  className="pagination-btn"
-                >
-                  Next
-                </button>
+                <button onClick={handlePrevPage} disabled={currentPage === 1} className="pagination-btn">Prev</button>
+                <span className="pagination-text">{currentPage} / {totalPages}</span>
+                <button onClick={handleNextPage} disabled={currentPage === totalPages} className="pagination-btn">Next</button>
               </div>
             )}
           </div>
